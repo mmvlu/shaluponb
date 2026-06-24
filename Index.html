@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <title>shaluponb</title>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.css" />
+
+    <style>
+        /* Кастомизация цвета кнопок и элементов плеера */
+        :root {
+            --plyr-color-main: #928dab; 
+            --plyr-video-radius: 12px;
+        }
+
+        /* Общие стили */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* НАДЁЖНО СТАВИМ ТВОЙ ДЕФОЛТНЫЙ КУРСОР НА ВСЮ СТРАНИЦУ */
+        html, body {
+            background-color: #060606;
+            color: #ffffff;
+            padding-bottom: 50px;
+            overflow-x: hidden;
+            cursor: url('main.cur'), default !important;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* КОНТЕЙНЕР ДЛЯ ЧАСТИЦ */
+        #tsparticles {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            top: 0;
+            left: 0;
+            z-index: 1; 
+            pointer-events: none;
+        }
+
+        /* ХАК ДЛЯ ВСЕХ КЛИКАБЕЛЬНЫХ ЭЛЕМЕНТОВ И ПЛЕЕРА PLYR */
+        a, 
+        button, 
+        .category-header, 
+        .video-wrapper, 
+        .plyr, 
+        .plyr *, 
+        .plyr__control, 
+        .plyr__video-wrapper,
+        .plyr__progress,
+        .plyr__volume {
+            cursor: url('select.cur'), pointer !important;
+        }
+
+        /* Шапка (Баннер) */
+        .banner {
+            width: 100%;
+            height: 461px;
+            position: relative;
+            z-index: 2;
+            margin-bottom: 10px;
+            overflow: hidden; /* Чтобы видео не вылезало за границы баннера */
+            background: #000000; /* Черная подложка, пока видео грузится */
+        }
+
+        .banner video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Видео заполнит весь баннер без растяжения и искажений */
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* Чтобы мышка не кликала по самому видео */
+        }
+
+        /* Контейнер для контента */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            position: relative;
+            z-index: 3;
+        }
+
+        /* Категории (Аккордеон с эффектом ЖИДКОГО СТЕКЛА) */
+        .category-section {
+            margin-bottom: 25px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+
+        .category-section:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 22px 25px;
+            user-select: none;
+        }
+
+        .category-title {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            background: linear-gradient(45deg, #ffffff, #b3aed2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .arrow {
+            width: 24px;
+            height: 24px;
+            transition: transform 0.3s ease;
+        }
+
+        /* Контент категории */
+        .category-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+            will-change: max-height;
+            padding: 0 25px;
+        }
+
+        /* Сетка видео */
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); 
+            gap: 30px; 
+            padding: 10px 0 30px 0;
+        }
+
+        /* Карточка видео (Стеклянный стиль) */
+        .video-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease, background 0.3s ease;
+            box-sizing: border-box; /* Чтобы паддинги не раздували карточку */
+        }
+
+        .video-card > .video-title {
+            display: -webkit-box !important;
+            width: 100% !important;
+            margin-top: 12px !important;     /* Делаем отступ от видео сверху */
+            padding-right: 0 !important;     /* Нам не нужно место под кнопку справа */
+        }
+
+        .video-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* КОНТЕЙНЕР-РАМКА 16:9 ДЛЯ ИДЕАЛЬНОЙ СЕТКИ ПРЕВЬЮ */
+        .video-wrapper {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 16 / 9; 
+            background-color: #0b0b0e;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        .video-wrapper .plyr {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* В обычном состоянии (в превью) видео аккуратно заполняет прямоугольник */
+        .video-wrapper video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important; 
+        }
+
+        /* Базовые стили подложки для фулскрина */
+        .plyr--fullscreen-active .plyr__video-wrapper {
+            background-color: #060606 !important;
+        }
+
+        /* Название под видео */
+        .video-title {
+            margin-top: 14px;
+            padding: 0 4px;
+            font-size: 15px;
+            color: #e0e0e0;
+            text-align: left;
+            font-weight: 500;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .category-section.active .arrow {
+            transform: rotate(180deg);
+        }
+
+            /* СЕКЦИЯ ОБ АВТОРЕ / ПЕРСОНАЖЕ */
+.about-section {
+    margin-top: 0px;
+    margin-bottom: 40px;
+    background: transparent; /* Полностью прозрачный фон */
+    border: none;            /* Убираем рамку */
+    padding: 10px 30px 1px 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+}
+
+/* Контент с текстом (слева) */
+.about-content {
+    flex: 1;
+}
+
+.about-subtitle {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #928dab;
+    margin-bottom: 8px;
+}
+
+.about-name {
+    font-size: 32px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    background: linear-gradient(45deg, #ffffff, #b3aed2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.about-text {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #cccccc;
+}
+
+/* Контейнер для картинки/гифки (справа) */
+.about-media {
+    flex-shrink: 0;
+    width: 400px;
+    height: 400px;
+    border-radius: 12px;
+    overflow: hidden; /* Это сдерживает видео, чтобы оно не вылезало наружу */
+    background: transparent; /* Убираем серый/чёрный фон подложки */
+    border: none;            /* Убираем рамку, если она осталась */
+    box-shadow: none;        /* Убираем тень, чтобы не было видно границ */
+    pointer-events: none;
+}
+
+.about-media video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Меняем cover на contain, если не хочешь, чтобы перса обрезало */
+    display: block;
+}
+
+/* Адаптив под мобилки (чтобы на телефонах картинка прыгала вниз) */
+@media (max-width: 768px) {
+    .about-section {
+        flex-direction: column-reverse;
+        text-align: center;
+        padding: 20px;
+        gap: 25px;
+    }
+    .about-media {
+        width: 200px;
+        height: 200px;
+    }
+}
+
+.character-img, .header-bg {
+    image-rendering: -webkit-optimize-contrast; /* Для Edge */
+    image-rendering: crisp-edges;               /* Для Firefox */
+    content-visibility: auto;                   /* Пропускает отрисовку, пока не нужно, освобождая ресурсы */
+}
+
+/* Видео-баннер в шапке (2000x460) */
+.banner-video {
+    width: 100%;
+    /* Пропорция: 2000 / 460 уменьшаем и получаем красивое соотношение */
+    aspect-ratio: 2000 / 460; 
+    object-fit: cover; /* Чтобы видео красиво заполняло область, если экран шире */
+    background: rgba(255, 255, 255, 0.01); /* Заглушка, пока видео не прогрузилось */
+}
+
+/* Видео-персонаж (400x400) */
+.character-video {
+    width: 400px;
+    height: 400px;
+    aspect-ratio: 1 / 1; /* Идеальный квадрат */
+    object-fit: contain; /* Сохраняет пропорции персонажа без обрезания краев */
+    
+    /* Если сайт адаптивный под мобилки, лучше добавить ограничение: */
+    max-width: 100%;
+    height: auto; 
+}
+
+.site-footer {
+    width: 100%;
+    background: transparent;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-family: sans-serif;
+    
+    /* МАГИЯ ФЛЕКСА: выталкивает строго на дно контента */
+    margin-top: auto; 
+    padding: 20px 0;
+    z-index: 10;
+    
+    /* УБРАЛИ все fixed, absolute и sticky, они больше не нужны */
+    position: relative; 
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    justify-content: center; /* Центр */
+    align-items: center;
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 13px;
+    text-align: center;
+    transition: color 0.3s ease;
+}
+
+        /* Жесткая двухколоночная сетка для подвала карточки */
+        .video-footer {
+    display: flex !important;
+    justify-content: space-between; /* Название влево, кнопка вправо */
+    align-items: center !important; 
+    margin-top: 12px;
+    width: 100% !important;
+    gap: 10px; /* Зазор между текстом и кнопкой */
+}
+
+        /* Ограничение названия видео на 2 строки */
+        .video-title {
+            font-size: 15px;
+            color: #e0e0e0;
+            font-weight: 500;
+            line-height: 1.3;
+            padding-right: 8px; 
+            margin: 0 !important;
+            
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Контейнер кнопки и поповера */
+        .video-info-container {
+            position: relative !important;
+            display: inline-block !important;
+        }
+
+        /* Маленькая круглая кнопка "i" */
+        .info-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.2s;
+        }
+
+        .info-btn:hover {
+            background: #928dab; 
+            transform: scale(1.1);
+        }
+
+        /* Всплывающее окошко со стеклянным эффектом */
+        .info-popover {
+            position: absolute;
+            bottom: 32px; 
+            right: 0;
+            width: 220px;
+            padding: 12px;
+            background: rgba(11, 11, 14, 0.95);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.7);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(10px);
+            transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
+            z-index: 100; 
+        }
+
+        .video-info-container:hover .info-popover {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .info-popover h4 { font-size: 14px; margin-bottom: 6px; color: #ffffff; font-weight: 600; }
+        .info-popover p { font-size: 12px; color: #aaaaaa; line-height: 1.4; margin-bottom: 4px; }
+        .info-popover a { display: inline-block; font-size: 12px; color: #928dab; text-decoration: none; margin-top: 6px; font-weight: 600; }
+        .info-popover a:hover { text-decoration: underline; }
+
+        .video-info-container.pinned .info-popover {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+            border-color: #928dab; 
+        }
+
+        .footer-contacts {
+    display: flex;
+    justify-content: center;
+    padding: 10px 20px 10px 10px;
+    margin-top: 10px; /* Отступ от сетки видео */
+}
+
+.social-links {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+}
+
+/* Текстовые ссылки */
+.social-link-minimal {
+    color: rgba(255, 255, 255, 0.5); /* Изначально полупрозрачные, серые */
+    text-decoration: none;
+    font-weight: 400;
+    position: relative;
+    transition: color 0.2s ease;
+}
+
+/* Эффект при наведении — текст просто плавно становится белым */
+.social-link-minimal:hover {
+    color: #ffffff;
+}
+
+/* Тонкая линия подчеркивания при наведении (опционально, для интерактивности) */
+.social-link-minimal::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    transform: scaleX(0);
+    height: 1px;
+    bottom: -2px;
+    left: 0;
+    background-color: #ffffff;
+    transform-origin: bottom right;
+    transition: transform 0.25s ease-out;
+}
+
+.social-link-minimal:hover::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
+}
+
+/* Разделитель между ссылками (палочка "/") */
+.links-divider {
+    color: rgba(255, 255, 255, 0.2);
+    user-select: none;
+}
+
+    </style>
+</head>
+<body>
+
+    <div id="tsparticles"></div>
+    <div class="banner">
+        <video src="banner.mp4" autoplay muted loop playsinline preload="auto" class="banner-video"></video>
+    </div>
+
+    <div class="container">
+
+                <!-- СЕКЦИЯ ОБ АВТОРЕ -->
+        <div class="about-section">
+            <!-- Текст слева -->
+            <div class="about-content">
+                <div class="about-subtitle">Motion Designer & Editor</div>
+                <h2 class="about-name">@sshaluponb</h2>
+                <p class="about-text">
+                    Привет, я шалупонь!! Я создаю интересные визуалы и моушн-графику. С 2018 года занимаюсь творчеством, а с 2024 года активно развиваюсь в дизайне и анимации, работая в основном в After Effects и иногда в Blender.
+                    <br> <br>
+                    Мне нравится экспериментировать со стилями, оживлять персонажей и делать графику, которая цепляет взгляд и запоминается. Буду рада интересным проектам, особенно в сфере музыки и развлекательного контента!
+                </p>
+            </div>
+            
+            <!-- Картинка/Гифка справа -->
+            <div class="about-media">
+                <video src="character.webm" autoplay muted loop playsinline preload="auto" class="character-video"></video>
+            </div>
+        </div>
+
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <span class="category-title">MOTION</span>
+                <svg class="arrow" viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="#ffffff" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/>
+                </svg>
+            </div>
+            <div class="category-content">
+                <div class="video-grid">
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/motion/shape_animation.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJtb3Rpb24vc2hhcGVfYW5pbWF0aW9uLm1wNCIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIxNTA3MDAsImV4cCI6MTgxMzY4NjcwMH0.cbfrhxaH2gzMAPH2BWDeOJ7zEru6bOmsZKuQnNLqtOk" playsinline preload="metadata"></video>
+                        </div>
+                            <div class="video-footer">
+                        <div class="video-title">The Less I Know the Better - Tame Impala</div>
+                    </div>
+                </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/motion/shape_animation2.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJtb3Rpb24vc2hhcGVfYW5pbWF0aW9uMi5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzgyMTUwNzEwLCJleHAiOjE4MTM2ODY3MTB9.kC-svzB9TNP3sy8m8k5ZRV3VC0XUwse65K5Zwd4Vykk" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">LEGACY - PIXY</div>
+                    </div>
+                </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/motion/UI_motion.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJtb3Rpb24vVUlfbW90aW9uLm1wNCIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIxNTA3MTcsImV4cCI6MTgxMzY4NjcxN30.uVP4llMXJZW-zVjBWHpX4q4k_4vi4sz7F3UTIHQCD1Q" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Fever - Buckshot & fakemink</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <span class="category-title">YOUTUBE GRAPHICS</span>
+                <svg class="arrow" viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="#ffffff" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/>
+                </svg>
+            </div>
+            <div class="category-content">
+                <div class="video-grid">
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/yt/AdeomaTwitch1.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ5dC9BZGVvbWFUd2l0Y2gxLm1wNCIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIxNTIyNDksImV4cCI6MTgxMzY4ODI0OX0.mQ6tJYKPWjW5GKonJEOmSzUyz9BMhIZUXewy4_j-QmA" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Графика для Адеома Твичер</div>
+                                            <div class="video-info-container">
+                        <button class="info-btn" onclick="toggleInfo(event, this)">i</button>
+                        <div class="info-popover">
+                            <h4>О проекте</h4>
+                            <a href="https://youtu.be/0CDFdXWcPog?si=ZIQE9KgdkYH21QZR&t=815" target="_blank">Видео на YouTube</a>
+                        </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/yt/F10_Albert1.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ5dC9GMTBfQWxiZXJ0MS5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzgyMTUyMjYwLCJleHAiOjE4MTM2ODgyNjB9.cuoTcvV-MmorS4I785gi0i5M4GOp03zZSVO6DjiU8Js" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Графика для Альберта</div>
+                                            <div class="video-info-container">
+                        <button class="info-btn" onclick="toggleInfo(event, this)">i</button>
+                        <div class="info-popover">
+                            <h4>О проекте</h4>
+                            <a href="https://youtu.be/6nzVqizXcMU?si=wAvkouEXG3Udhs-I&t=1282" target="_blank">Видео на YouTube</a>
+                        </div>
+                        </div>  
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/yt/IN1_Albert1.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ5dC9JTjFfQWxiZXJ0MS5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzgyMTUyMjcwLCJleHAiOjE4MTM2ODgyNzB9.EZ0iA9tyITCzW-wt9yE0XhYaQxJRe31LQgtA7p8BGjs" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Графика для Альберта</div>
+                        <div class="video-info-container">
+                        <button class="info-btn" onclick="toggleInfo(event, this)">i</button>
+                        <div class="info-popover">
+                            <h4>О проекте</h4>
+                            <a href="https://youtu.be/xauU6wR5wbo?si=E62VlpB4oUVtO-Rq" target="_blank">Видео на YouTube</a>
+                        </div>
+                        </div>
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/yt/GOMER1.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ5dC9HT01FUjEubXA0Iiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4MjE1MjI4NSwiZXhwIjoxODEzNjg4Mjg1fQ.Kc_E7wHvzJr6DjQLsG0jpdmDJg7pDah3Gd77A6-BjXM" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Графика для GOMER</div>
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/yt/GOMER2.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ5dC9HT01FUjIubXA0Iiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4MjE1MjI5MywiZXhwIjoxODEzNjg4MjkzfQ.Yeef2NlmmwU2-8aL2jyRG1zScTB4htOOMC5BahuzWfE" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Графика для GOMER</div>
+                    </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/yt/GOMER3_1.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ5dC9HT01FUjNfMS5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzgyMTUyMzA1LCJleHAiOjE4MTM2ODgzMDV9.cYNEC3DBEDfKTGPNDUbQbQi0zQoG-wXgVMSDC2Prwd8" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Графика для GOMER</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="category-section">
+            <div class="category-header" onclick="toggleCategory(this)">
+                <span class="category-title">EDITS VFX</span>
+                <svg class="arrow" viewBox="0 0 24 24" width="24" height="24">
+                    <path fill="#ffffff" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/>
+                </svg>
+            </div>
+            <div class="category-content">
+                <div class="video-grid">
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/graph/kamaz.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJncmFwaC9rYW1hei5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzgyMTQ5NTg4LCJleHAiOjE4MTM2ODU1ODh9._f_CMZl0jcBGhPZRgvrM4KKiljGYeNvu0O-8G8bINqg" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">меня сбил камаз(( - ximora</div>
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/graph/VFX.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJncmFwaC9WRlgubXA0Iiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4MjE1MDU3OCwiZXhwIjoxODEzNjg2NTc4fQ.qF0wVcZHOUoQG7RslqWfNB8JiBveAo5XQGG6PrE1Ctg" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Cali Man - EsDeeKid & Rico Ace</div>
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/graph/callmeupalone.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJncmFwaC9jYWxsbWV1cGFsb25lLm1wNCIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIxNTA1MzMsImV4cCI6MTgxMzY4NjUzM30.nswxRkJj_YIbmWWve4OpRzSIKbvAZkXqbCwsIoVbL3k" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">Call Me Up Alone - Madi Marie</div>
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/graph/distonya.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJncmFwaC9kaXN0b255YS5tcDQiLCJzY29wZSI6ImRvd25sb2FkIiwiaWF0IjoxNzgyMTUwNTIzLCJleHAiOjE4MTM2ODY1MjN9.DxXt8oWfUXI_ompmgNBnW22csItvf5xAQQYAzCI3l7s" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">дистония - dekma</div>
+                        </div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/graph/ElfenLied.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJncmFwaC9FbGZlbkxpZWQubXA0Iiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4MjE0OTc5MywiZXhwIjoxODEzNjg1NzkzfQ.QEyOThLUfwSBunXVhfKyNqozQlVVOo6S4qRFTz1Q9No" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-title">Hardstyle Drill 2009 Nokia Angelz 1.6 - Yabujin</div>
+                    </div>
+                    <div class="video-card">
+                        <div class="video-wrapper">
+                            <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/graph/fragile.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJncmFwaC9mcmFnaWxlLm1wNCIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIxNTA0OTgsImV4cCI6MTgxMzY4NjQ5OH0.GMuCjJEIT_adsDM7sMbHEyynU-7tgdjIleuMvWmfN1Q" playsinline preload="metadata"></video>
+                        </div>
+                        <div class="video-footer">
+                        <div class="video-title">FRAGILE - dekma</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<div class="category-section">
+    <div class="category-header" onclick="toggleCategory(this)">
+        <span class="category-title">STREAM</span>
+        <svg class="arrow" viewBox="0 0 24 24" width="24" height="24">
+            <path fill="#ffffff" d="M7.41,8.58L12,13.17L16.59,8.58L18,10L12,16L6,10L7.41,8.58Z"/>
+        </svg>
+    </div>
+    <div class="category-content">
+        <div class="video-grid">
+            
+            <div class="video-card">
+                <div class="video-wrapper">
+                    <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/STREAM/intro.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJTVFJFQU0vaW50cm8ubXA0Iiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4MjE2MjcyNCwiZXhwIjoxODEzNjk4NzI0fQ.GP8cVnuSow_FUX7BtetKUGD2MX86c278Xrb0VEdv85M" playsinline preload="metadata"></video>
+                </div>
+                <div class="video-footer">
+                    <div class="video-title">YouTube intro</div>
+                </div>
+            </div>
+
+            <div class="video-card">
+                <div class="video-wrapper">
+                    <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/STREAM/outro.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJTVFJFQU0vb3V0cm8ubXA0Iiwic2NvcGUiOiJkb3dubG9hZCIsImlhdCI6MTc4MjE2MjcxNSwiZXhwIjoxODEzNjk4NzE1fQ.2Wfbqpd8DA2jz5iAo3pZzkmw_WRkIvOaiJ2P68vHbUs" playsinline preload="metadata"></video>
+                </div>
+                <div class="video-footer">
+                    <div class="video-title">YouTube outro</div>
+                </div>
+            </div>
+
+            <div class="video-card"> <div class="video-wrapper">
+                    <video class="js-plyr" src="https://tdofognhpsmabpwzklwy.supabase.co/storage/v1/object/sign/STREAM/pause_T2x2_1.mp4?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83MDAxODVkOS04YTM5LTQyNzEtYTBiMC1iOWZlOTY2MjFlOTIiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJTVFJFQU0vcGF1c2VfVDJ4Ml8xLm1wNCIsInNjb3BlIjoiZG93bmxvYWQiLCJpYXQiOjE3ODIxNjQ5NjksImV4cCI6MTgxMzcwMDk2OX0.d2a0xzntlcWOC1zS58L2KAnMweDlBPjs2hnoR1E3kKM" playsinline preload="metadata"></video>
+                </div>
+                <div class="video-footer">
+                    <span class="video-title">Заставка для T2x2</span>
+                    <div class="video-info-container">
+                        <button class="info-btn" onclick="toggleInfo(event, this)">i</button>
+                        <div class="info-popover">
+                            <h4>О проекте</h4>
+                            <a href="https://youtu.be/KnMai4Phh4w?si=23sHVzfUTiI-cv0y&t=182" target="_blank">Заставка на стриме</a>
+                        </div>
+                    </div>
+                </div>
+            </div> </div>
+    </div>
+</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/plyr@3.7.8/dist/plyr.polyfilled.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tsparticles/preset-stars@3.0.2/tsparticles.preset.stars.bundle.min.js"></script>
+
+    <script>
+        const activePlayers = [];
+
+        // 1. ИНИЦИАЛИЗАЦИЯ ИНТЕРАКТИВНОГО ФОНА
+        tsParticles.load({
+            id: "tsparticles",
+            options: {
+                preset: "stars",
+                background: { color: { value: "#060606" } },
+                particles: {
+                    color: { value: "#555555" },
+                    number: { value: 70 },
+                    size: { value: { min: 1, max: 3 } },
+                    move: { speed: 0.4 },
+                },
+                interactivity: {
+                    events: {
+                        onHover: { enable: true, mode: "repulse" }
+                    },
+                    modes: { repulse: { distance: 100, speed: 1 } }
+                }
+            }
+        });
+
+        // 2. ФУНКЦИЯ ДЛЯ АККОРДЕОНА И ПЛЕЕРОВ
+        function toggleCategory(header) {
+            const section = header.parentElement;
+            const content = section.querySelector('.category-content');
+            
+            section.classList.toggle('active');
+
+            if (section.classList.contains('active')) {
+                content.style.maxHeight = content.scrollHeight + "px";
+                
+                setTimeout(() => {
+                    const videoElements = content.querySelectorAll('video.js-plyr');
+                    videoElements.forEach(video => {
+                        if (!video.classList.contains('plyr-initialized')) {
+                            video.classList.add('plyr-initialized');
+                            
+                            // Дефолтная инициализация плеера без клинящих ratio
+                            const player = new Plyr(video, {
+                                controls: ['play-large', 'play', 'progress', 'current-time', 'mute', 'volume', 'fullscreen'],
+                                resetOnEnd: true
+                            });
+
+                            // ХИРУРГИЧЕСКИЙ ЖЕСТКИЙ СБРОС ИНЛАЙН-ПРОПОРЦИЙ ПРИ ВХОДЕ В ФУЛСКРИН
+                            player.on('enterfullscreen', () => {
+                                const videoTag = player.elements.container.querySelector('video');
+                                const wrapper = player.elements.container.querySelector('.plyr__video-wrapper');
+                                
+                                if (videoTag && wrapper) {
+                                    // Убиваем проценты padding-bottom, которые Plyr считает под 16:9
+                                    wrapper.style.setProperty('padding-bottom', '0', 'important');
+                                    wrapper.style.setProperty('height', '100%', 'important');
+                                    wrapper.style.setProperty('aspect-ratio', 'auto', 'important');
+                                    
+                                    // Возвращаем видео его оригинальный недеформированный квадрат
+                                    videoTag.style.setProperty('object-fit', 'contain', 'important');
+                                    videoTag.style.setProperty('width', '100%', 'important');
+                                    videoTag.style.setProperty('height', '100%', 'important');
+                                }
+                            });
+
+                            // Возвращаем аккуратный cover при выходе обратно в сетку превьюшек
+                            player.on('exitfullscreen', () => {
+                                const videoTag = player.elements.container.querySelector('video');
+                                const wrapper = player.elements.container.querySelector('.plyr__video-wrapper');
+                                
+                                if (videoTag && wrapper) {
+                                    wrapper.style.removeProperty('padding-bottom');
+                                    wrapper.style.removeProperty('height');
+                                    wrapper.style.removeProperty('aspect-ratio');
+                                    
+                                    videoTag.style.setProperty('object-fit', 'cover', 'important');
+                                }
+                            });
+                            
+                            activePlayers.push(player);
+                        }
+                    });
+                }, 400);
+
+            } else {
+                content.style.maxHeight = "0px";
+                const videos = content.querySelectorAll('video');
+                videos.forEach(video => {
+                    if (video.plyr) {
+                        video.plyr.pause();
+                    }
+                });
+            }
+        }
+
+        function toggleInfo(event, button) {
+    // Останавливаем всплытие, чтобы клик по кнопке не запускал/ставил на паузу само видео
+    event.stopPropagation(); 
+    
+    const container = button.parentElement;
+    
+    // Переключаем класс фиксации
+    container.classList.toggle('pinned');
+}
+
+// Закрываем все зафиксированные окна, если кликнули в любое другое место экрана
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.video-info-container')) {
+        document.querySelectorAll('.video-info-container.pinned').forEach(container => {
+            container.classList.remove('pinned');
+        });
+    }
+});
+    </script>
+
+    <div class="footer-contacts">
+    <div class="social-links">
+        <a href="https://t.me/shaluppnb" target="_blank" class="social-link-minimal">Личные сообщения</a>
+        <span class="links-divider">/</span>
+        <a href="https://t.me/sshaluponb" target="_blank" class="social-link-minimal">Telegram-канал</a>
+    </div>
+</div>
+
+    <footer class="site-footer">
+        <div class="footer-content">
+            &copy; Yo Yo Yo, 1483 to the 3 to the 6 to the 9. Representing the ABQ. What's up BIATCH! Leave at the tone.
+        </div>
+    </footer>
+</body>
+</html>
